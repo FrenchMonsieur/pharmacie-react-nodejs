@@ -1,0 +1,37 @@
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 1rem 2rem;
+
+    background-color: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+}
+
+.site-header__home {
+    padding: 0.6rem 1rem;
+
+    font-family: var(--font-heading);
+    color: var(--text-main);
+    text-decoration: none;
+}
+
+.site-header__nav {
+    display: flex;
+    gap: 2rem;
+
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.site-header__link {
+    padding: 0.6rem 1rem;
+
+    color: var(--text-main);
+    text-decoration: none;
+}
+
+.site-header__link:hover {
+    color: var(--accent);
+}
