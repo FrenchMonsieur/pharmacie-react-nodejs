@@ -9,7 +9,7 @@ const app = express();
 const port = Number(process.env.API_PORT) || 3000;
 const LIVRES_PAR_PAGE = 6;
 
-// Limite à 100 requêtes par minute et par adresse IP.
+// on limite les requêtes a 100 par minute pour éviter les abus et protéger le serveur
 const limiteur = rateLimit({
     windowMs: 60_000,
     limit: 100,
@@ -17,7 +17,9 @@ const limiteur = rateLimit({
     message: { erreur: 'Trop de requêtes. Réessayez plus tard.' }
 });
 
-// CORS autorise React à appeler notre API depuis une autre origine.
+// tous les app.use() sont exécutés sur chaque requête avant les routes
+
+// a la base le navigateur refuse les requêtes de plusieurs port donc on utilise cors pour autoriser les requêtes de notre front react (port 5173) et de notre site netlify (monsite.netlify.app)
 app.use(cors({
     origin: [
         'http://localhost:5173',
@@ -26,14 +28,11 @@ app.use(cors({
 }));
 
 app.use(limiteur);
+
+// sert à ce que le serveur puisse les lire le JSON envoyer par react
 app.use(express.json());
 
-// Route de vérification : http://localhost:3000/
-app.get('/', (req, res) => {
-    res.json({ message: 'API Bibliothèque opérationnelle' });
-});
-
-// Fournit les catégories utilisées dans le menu déroulant React.
+// recupère le nom de chaque catégorie pour le menu déroulant React
 app.get('/api/categories', async (req, res) => {
     try {
         const [categories] = await pool.execute(
@@ -49,7 +48,7 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
-// Fournit les auteurs utilisés dans le menu déroulant React.
+// recupère le nom de chaque auteur pour le menu déroulant React
 app.get('/api/auteurs', async (req, res) => {
     try {
         const [auteurs] = await pool.execute(
@@ -65,8 +64,7 @@ app.get('/api/auteurs', async (req, res) => {
     }
 });
 
-// GET /api/livre : filtres cumulables, recherche par titre, tri,
-// pagination et statistiques sur les résultats filtrés.
+// GET /api/livre récupère les livres
 app.get('/api/livre', async (req, res) => {
 
     // Vérifie que les paramètres sont des chaînes avant d'appeler .trim().
@@ -102,36 +100,39 @@ app.get('/api/livre', async (req, res) => {
     const nom = req.query.nom?.trim();
     const triDemande = req.query.tri?.trim() ?? '';
 
-    // Le tri n'utilise que des colonnes SQL connues (liste blanche).
+    // la whitelist limite le tri aux colonnes de la table livre pour éviter les injections SQL
     const whitelist = {
         titre: 'livre.titre',
         annee: 'livre.annee',
         prix: 'livre.prix'
     };
 
+    // si le tri demandé n'est pas dans la whitelist, on utilise le tri par défaut
     const trie_resultat = Object.hasOwn(whitelist, triDemande)
         ? whitelist[triDemande]
         : 'livre.id';
 
-    // La pagination commence à 1.
-    // OFFSET indique combien de livres ignorer avant la page demandée.
+    // on commencence la pagination à la page 1 
     const page = Number(req.query.page ?? 1);
 
+    // vérifie que la page demander est un nombre entier positif
     if (!Number.isSafeInteger(page) || page <= 0) {
         return res.status(400).json({
             erreur: 'Numéro de page invalide.'
         });
     }
 
+    // calcul de l'offset pour la pagination
     const pagination = (page - 1) * LIVRES_PAR_PAGE;
 
+    // vérifie que l'offset est un nombre entier sûr
     if (!Number.isSafeInteger(pagination)) {
         return res.status(400).json({
             erreur: 'Numéro de page trop grand.'
         });
     }
 
-    // Vérification des filtres numériques avant d'interroger MySQL.
+    // vérifie les données de la requête pour éviter les injections SQL et les erreurs de type
     if (
         categorie !== undefined &&
         categorie !== '' &&
@@ -168,26 +169,18 @@ app.get('/api/livre', async (req, res) => {
         });
     }
 
-    // Les trois requêtes partagent les mêmes jointures et les mêmes filtres.
-    // WHERE 1=1 permet d'ajouter facilement chaque condition avec AND.
-
-    // Première requête : récupérer les livres avec leurs auteurs et catégories.
+    // requête SQL pour récupérer les livres avec ou sans filtre
     let sql = 'SELECT livre.id, livre.titre, livre.annee, livre.nb_pages, livre.prix, livre.stock, auteur.nom AS auteur_nom, auteur.prenom AS auteur_prenom, categorie.nom AS categorie_nom FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
 
-    // Deuxième requête : compter les livres filtrés sans pagination.
+    // requête SQL pour compter le nombre total de livres avec ou sans filtre
     let sql_2 = 'SELECT COUNT(*) AS total FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
 
-    // Troisième requête : compter les livres et calculer leur prix moyen.
-    // COUNT(*) compte les livres.
-    // AVG(prix) calcule le prix moyen.
-    // ROUND(..., 2) arrondit à deux décimales.
-    // COALESCE remplace NULL par 0 lorsqu'aucun livre ne correspond.
+    // requête SQL pour calculer le nombre de livres et le prix moyen
     let sql_3 = 'SELECT COUNT(*) AS nombre_livres, COALESCE(ROUND(AVG(livre.prix), 2), 0) AS prix_moyen FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
 
-    // Les ? sont remplacés par ces valeurs via les requêtes préparées.
+    // les paramètres sont stockés dans un tableau vide qui sera rempli en fonction des filtres appliqués
     const parametres = [];
 
-    // Filtre par catégorie.
     if (categorie !== undefined && categorie !== '') {
         sql += ' AND livre.categorie_id = ?';
         sql_2 += ' AND livre.categorie_id = ?';
@@ -196,7 +189,6 @@ app.get('/api/livre', async (req, res) => {
         parametres.push(categorie);
     }
 
-    // Filtre par auteur.
     if (auteur !== undefined && auteur !== '') {
         sql += ' AND livre.auteur_id = ?';
         sql_2 += ' AND livre.auteur_id = ?';
@@ -205,7 +197,6 @@ app.get('/api/livre', async (req, res) => {
         parametres.push(auteur);
     }
 
-    // Filtre par prix maximum.
     if (prix !== undefined && prix !== '') {
         sql += ' AND livre.prix <= ?';
         sql_2 += ' AND livre.prix <= ?';
@@ -214,15 +205,9 @@ app.get('/api/livre', async (req, res) => {
         parametres.push(prix);
     }
 
-    // ORDER BY concerne uniquement la liste des livres.
-    // Les requêtes COUNT(*) et AVG() n'ont pas besoin de tri.
+    // on ajoute le tri demandé par l'utilisateur ou le tri par défaut a la requête SQL peut importe si il y a un filtre ou pas
     sql += ` ORDER BY ${trie_resultat}, livre.titre`;
 
-    // Sans recherche textuelle, MySQL renvoie directement
-    // les 6 livres correspondant à la page demandée.
-    //
-    // Avec recherche, MiniSearch doit recevoir tous les livres
-    // déjà filtrés pour effectuer sa recherche correctement.
     if (!nom) {
         sql += ` LIMIT ${LIVRES_PAR_PAGE} OFFSET ${pagination}`;
     }
@@ -230,17 +215,12 @@ app.get('/api/livre', async (req, res) => {
     try {
         const [resultat] = await pool.execute(sql, parametres);
 
-        // Ces variables seront remplies différemment
-        // selon qu'une recherche par titre est active ou non.
         let livrespage;
         let page_number;
 
-        // null signifie qu'aucune statistique n'est à afficher.
         let moyenne = null;
 
         if (nom) {
-            // MiniSearch recherche dans les titres,
-            // même si l'utilisateur commet une petite faute.
             const miniSearch = new MiniSearch({
                 fields: ['titre'],
                 storeFields: [
@@ -255,75 +235,50 @@ app.get('/api/livre', async (req, res) => {
                 ]
             });
 
-            // Ajoute les livres récupérés par MySQL dans l'index MiniSearch.
             miniSearch.addAll(resultat);
 
-            // prefix autorise les recherches incomplètes.
-            // fuzzy tolère certaines erreurs de frappe.
             const livresTrouves = miniSearch.search(nom, {
                 prefix: true,
                 fuzzy: 0.2
             });
 
-            // Sans tri demandé, MiniSearch garde
-            // son classement par pertinence.
             if (triDemande === 'prix') {
                 livresTrouves.sort((a, b) => {
                     if (a.prix - b.prix === 0) {
                         return a.titre.localeCompare(b.titre, 'fr');
                     }
-
                     return a.prix - b.prix;
                 });
-
             } else if (triDemande === 'annee') {
                 livresTrouves.sort((a, b) => {
                     if (a.annee - b.annee === 0) {
                         return a.titre.localeCompare(b.titre, 'fr');
                     }
-
                     return a.annee - b.annee;
                 });
-
             } else if (triDemande === 'titre') {
                 livresTrouves.sort((a, b) =>
                     a.titre.localeCompare(b.titre, 'fr')
                 );
             }
 
-            // Calcule le nombre total de pages à partir
-            // de TOUS les livres trouvés par MiniSearch.
             page_number = Math.ceil(
                 livresTrouves.length / LIVRES_PAR_PAGE
             );
 
-            // slice() sélectionne uniquement les livres
-            // qui doivent apparaître sur la page actuelle.
             livrespage = livresTrouves.slice(
                 pagination,
                 pagination + LIVRES_PAR_PAGE
             );
 
-            // Statistiques uniquement si une catégorie est sélectionnée.
-            // On utilise tous les résultats de MiniSearch,
-            // pas uniquement les 6 livres de la page actuelle.
             if (categorie) {
 
-                // length donne le nombre d'objets contenus dans le tableau.
                 const nombre_livres = livresTrouves.length;
 
-                // reduce() parcourt chaque livre pour additionner ses prix.
-                // somme contient le total calculé au passage précédent.
-                // livre représente l'objet actuellement parcouru.
-                //
-                // Number() évite de concaténer les prix
-                // si MySQL les renvoie sous forme de chaînes.
                 const totalPrix = livresTrouves.reduce((somme, livre) => {
                     return somme + Number(livre.prix);
                 }, 0);
 
-                // On évite une division par zéro
-                // lorsqu'aucun livre ne correspond à la recherche.
                 let prix_moyen;
 
                 if (nombre_livres > 0) {
@@ -334,8 +289,6 @@ app.get('/api/livre', async (req, res) => {
                     prix_moyen = 0;
                 }
 
-                // On rassemble les deux statistiques
-                // dans un objet qui sera envoyé à React.
                 moyenne = {
                     nombre_livres,
                     prix_moyen
@@ -343,11 +296,6 @@ app.get('/api/livre', async (req, res) => {
             }
 
         } else {
-            // Sans recherche par titre, MySQL compte
-            // tous les livres correspondant aux filtres.
-            //
-            // COUNT(*) ne contient pas LIMIT ni OFFSET :
-            // il compte donc tous les livres, pas seulement les 6 affichés.
             const [resultat_total] = await pool.execute(
                 sql_2,
                 parametres
@@ -357,29 +305,18 @@ app.get('/api/livre', async (req, res) => {
                 resultat_total[0].total / LIVRES_PAR_PAGE
             );
 
-            // La première requête SQL a déjà appliqué LIMIT et OFFSET.
             livrespage = resultat;
 
-            // Les statistiques SQL sont exécutées seulement
-            // lorsqu'une catégorie est sélectionnée.
             if (categorie) {
                 const [statistiques] = await pool.execute(
                     sql_3,
                     parametres
                 );
 
-                // MySQL renvoie un tableau contenant un objet.
-                // [0] récupère le premier objet de ce tableau.
                 moyenne = statistiques[0];
             }
         }
 
-        // Le format JSON reste identique dans tous les cas.
-        //
-        // React récupère :
-        // donnees.livrespage
-        // donnees.page_number
-        // donnees.moyenne
         return res.json({
             livrespage,
             page_number,
@@ -395,11 +332,10 @@ app.get('/api/livre', async (req, res) => {
     }
 });
 
-// Détail d'un livre à partir de son identifiant dans l'URL.
+// GET /api/livre/:id récupère un livre par son id pour la page détaillée
 app.get('/api/livre/:id', async (req, res) => {
     const id = req.params.id;
 
-    // L'identifiant doit être un entier strictement positif.
     if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
         return res.status(400).json({
             erreur: 'Identifiant invalide.'
@@ -418,8 +354,6 @@ app.get('/api/livre/:id', async (req, res) => {
             });
         }
 
-        // Une fiche détail contient un seul livre.
-        // On renvoie donc le premier objet, pas un tableau.
         return res.json(resultat[0]);
 
     } catch (err) {
@@ -431,14 +365,14 @@ app.get('/api/livre/:id', async (req, res) => {
     }
 });
 
-// Gestion des adresses qui ne correspondent à aucune route.
+// gestion des routes non trouvées
 app.use((req, res) => {
     res.status(404).json({
         erreur: 'Route introuvable.'
     });
 });
 
-// Démarrage de l'API.
+// pour savoir sur quel port le serveur écoute et que l'API est disponible
 app.listen(port, () => {
     console.log(`API disponible sur http://localhost:${port}`);
 });
