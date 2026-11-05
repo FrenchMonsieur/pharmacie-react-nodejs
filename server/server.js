@@ -344,7 +344,7 @@ app.get('/api/livre/:id', async (req, res) => {
 
     try {
         const [resultat] = await pool.execute(
-            'SELECT livre.id, livre.titre, livre.annee, livre.nb_pages, livre.prix, livre.stock, auteur.nom AS auteur_nom, auteur.prenom AS auteur_prenom, categorie.nom AS categorie_nom FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE livre.id = ?',
+            'SELECT livre.id, livre.titre, livre.description, livre.annee, livre.nb_pages, livre.prix, livre.stock, auteur.nom AS auteur_nom, auteur.prenom AS auteur_prenom, categorie.nom AS categorie_nom FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE livre.id = ?',
             [id]
         );
 

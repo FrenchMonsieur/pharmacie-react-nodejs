@@ -191,9 +191,7 @@ function Livre() {
                                 id={livre.id}
                                 titre={livre.titre}
                                 annee={livre.annee}
-                                nb_pages={livre.nb_pages}
                                 prix={livre.prix}
-                                stock={livre.stock}
                                 auteur_nom={livre.auteur_nom}
                                 auteur_prenom={livre.auteur_prenom}
                                 categorie_nom={livre.categorie_nom}

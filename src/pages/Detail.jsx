@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 
 import './Detail.css';
 
-import LivreCard from '../components/LivreCard.jsx';
+import DetailCard from '../components/DetailCard.jsx';
 
 function Detail() {
     const [livre, setLivre] = useState(null);
@@ -60,8 +60,9 @@ function Detail() {
             <h1 className="library-page__title">Detail</h1>
 
             <div className="Detail-livre">
-                <LivreCard
+                <DetailCard
                     titre={livre.titre}
+                    description={livre.description}
                     annee={livre.annee}
                     nb_pages={livre.nb_pages}
                     prix={livre.prix}
