@@ -1,6 +1,3 @@
-
-import { Link } from 'react-router';
-
 function DetailCard({ titre, description, annee, nb_pages, prix, stock, auteur_nom, auteur_prenom, categorie_nom }) {
     return (
         <article className="livre-card">
