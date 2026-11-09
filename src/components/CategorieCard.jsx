@@ -1,11 +1,10 @@
 
-function AuthorCard({ nom, prenom, nationalite }) {
+function CategorieCard({ nom }) {
     return (
-        <article className="author-card">
-            <h2 className="author-card__title">{nom} {prenom}</h2>
-            <p className="author-card__nationality">{nationalite}</p>
+        <article className="categorie-card">
+            <h2 className="categorie-card__title">{nom}</h2>
         </article>
     );
 }
 
-export default AuthorCard;
+export default CategorieCard;

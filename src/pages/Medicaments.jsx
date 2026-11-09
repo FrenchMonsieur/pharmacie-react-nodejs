@@ -1,24 +1,21 @@
 
 import { useEffect, useState } from 'react';
 
-import './Livre.css';
+import './Medicaments.css';
 
-import LivreCard from '../components/LivreCard.jsx';
+import MedicamentCard from '../components/MedicamentCard.jsx';
 
-function Livre() {
-    const [livres, setLivre] = useState([]);
+function Medicaments() {
+    const [medicaments, setMedicaments] = useState([]);
     const [categorie, setCategorie] = useState("");
-    const [auteur, setAuteur] = useState("");
     const [prix, setPrix] = useState("");
     const [nom, setNom] = useState("");
     const [tri, setTri] = useState("");
     const [categories, setCategories] = useState([]);
-    const [auteurs, setAuteurs] = useState([]);
     const [page, setPage] = useState(1);
     const [page_number, setPage_number] = useState(1);
-    const [chargementLivre, setChargementLivre] = useState(true);
+    const [chargementMedicament, setChargementMedicament] = useState(true);
     const [chargementCategorie, setChargementCategorie] = useState(true);
-    const [chargementAuteur, setChargementAuteur] = useState(true);
     const [erreur, setErreur] = useState('');
     const [moyenne, setMoyenne] = useState(null);
 
@@ -26,11 +23,11 @@ function Livre() {
 
         const controller = new AbortController();
         const timer = setTimeout(() => {
-            async function chargerLivre() {
+            async function chargerMedicaments() {
                 try {
-                    setChargementLivre(true);
+                    setChargementMedicament(true);
                     setErreur('');
-                    const reponse = await fetch(`http://localhost:3000/api/livre?categorie=${categorie}&auteur=${auteur}&prix=${prix}&nom=${nom}&tri=${tri}&page=${page}`, {
+                    const reponse = await fetch(`http://localhost:3000/api/medicament?categorie=${categorie}&prix=${prix}&nom=${nom}&tri=${tri}&page=${page}`, {
                         signal: controller.signal
                     });
 
@@ -40,34 +37,34 @@ function Livre() {
 
                     const donnees = await reponse.json();
 
-                    setLivre(donnees.livrespage);
+                    setMedicaments(donnees.medicamentspage);
                     setPage_number(donnees.page_number);
                     setMoyenne(donnees.moyenne);
                 } catch (err) {
                     if (err.name !== 'AbortError') {
-                        setLivre([]);
+                        setMedicaments([]);
 
                         console.error(err);
 
                         if (err.message === 'Erreur HTTP 429') {
                             setErreur('Trop de requêtes. Réessayez plus tard.');
                         } else {
-                            setErreur('Impossible de charger les livres.');
+                            setErreur('Impossible de charger les médicaments.');
                         }
                     }
                 } finally {
                     if (!controller.signal.aborted) {
-                        setChargementLivre(false);
+                        setChargementMedicament(false);
                     }
                 }
             }
-            chargerLivre();
+            chargerMedicaments();
         }, 500);
         return () => {
             clearTimeout(timer);
             controller.abort();
         };
-    }, [categorie, auteur, prix, nom, tri, page]);
+    }, [categorie, prix, nom, tri, page]);
 
     useEffect(() => {
         async function chargerCategorie() {
@@ -91,40 +88,18 @@ function Livre() {
         chargerCategorie();
     }, []);
 
-    useEffect(() => {
-        async function chargerAuteur() {
-            try {
-                const reponse = await fetch('http://localhost:3000/api/auteurs');
-                if (!reponse.ok) {
-                    throw new Error(`Erreur HTTP ${reponse.status}`);
-                }
-
-                const donnees = await reponse.json();
-
-                setAuteurs(donnees);
-            } catch (err) {
-                console.error(err);
-
-                setErreur('Impossible de charger auteur.');
-            } finally {
-                setChargementAuteur(false);
-            }
-        }
-        chargerAuteur();
-    }, []);
-
-    if (chargementCategorie || chargementAuteur) {
+    if (chargementCategorie) {
         return (
             <section className="library-page">
-                <h1 className="library-page__title">Notre bibliothèque</h1>
-                <p>Chargement des livres...</p>
+                <h1 className="library-page__title">Nos médicaments</h1>
+                <p>Chargement des médicaments...</p>
             </section>
         );
     }
 
     return (
         <section className="library-page">
-            <h1 className="library-page__title">Notre bibliothèque</h1>
+            <h1 className="library-page__title">Nos médicaments</h1>
 
             <select onChange={(e) => {
                 setCategorie(e.target.value);
@@ -132,20 +107,8 @@ function Livre() {
             }} value={categorie}>
                 <option value="">Toutes les catégories</option>
                 {categories.map((categorie) => (
-                    <option key={categorie.id} value={categorie.id}>
+                    <option key={categorie.id_cat} value={categorie.id_cat}>
                         {categorie.nom}
-                    </option>
-                ))}
-            </select>
-
-            <select onChange={(e) => {
-                setAuteur(e.target.value);
-                setPage(1);
-            }} value={auteur}>
-                <option value="">Toutes les auteurs</option>
-                {auteurs.map((auteur) => (
-                    <option key={auteur.id} value={auteur.id}>
-                        {auteur.prenom} {auteur.nom}
                     </option>
                 ))}
             </select>
@@ -155,8 +118,7 @@ function Livre() {
                 setPage(1);
             }} value={tri}>
                 <option value="">Toutes les tries</option>
-                <option value="titre">Titre</option>
-                <option value="annee">Année</option>
+                <option value="nom">Nom</option>
                 <option value="prix">Prix</option>
             </select>
 
@@ -169,32 +131,31 @@ function Livre() {
 
             {categorie !== "" && moyenne && (
                 <div className="stat">
-                    <p>{moyenne.nombre_livres}</p>
-                    <p>{moyenne.prix_moyen} $</p>
+                    <p>{moyenne.nombre_medicaments}</p>
+                    <p>{moyenne.prix_moyen} € HT</p>
                 </div>
             )}
 
             <input type="search" onChange={(e) => {
                 setNom(e.target.value);
                 setPage(1);
-            }} value={nom} maxLength={100} placeholder="Entrer un titre" />
+            }} value={nom} maxLength={100} placeholder="Entrer un nom" />
 
             <div className="library-page__list">
-                {chargementLivre ? <section className="library-page">
-                    <h1 className="library-page__title">Notre bibliothèque</h1>
-                    <p>Chargement des livres...</p>
+                {chargementMedicament ? <section className="library-page">
+                    <h1 className="library-page__title">Nos médicaments</h1>
+                    <p>Chargement des médicaments...</p>
                 </section> :
-                    livres.length === 0 && !erreur ? <p>Aucun livre ne correspond</p> :
-                        livres.map((livre) => (
-                            <LivreCard
-                                key={livre.id}
-                                id={livre.id}
-                                titre={livre.titre}
-                                annee={livre.annee}
-                                prix={livre.prix}
-                                auteur_nom={livre.auteur_nom}
-                                auteur_prenom={livre.auteur_prenom}
-                                categorie_nom={livre.categorie_nom}
+                    medicaments.length === 0 && !erreur ? <p>Aucun médicament ne correspond</p> :
+                        medicaments.map((medicament) => (
+                            <MedicamentCard
+                                key={medicament.id_med}
+                                id_med={medicament.id_med}
+                                nom={medicament.nom}
+                                dosage={medicament.dosage}
+                                forme={medicament.forme}
+                                prix_ht={medicament.prix_ht}
+                                categorie_nom={medicament.categorie_nom}
                             />
                         ))
                 }
@@ -221,4 +182,4 @@ function Livre() {
 }
 
 
-export default Livre;
+export default Medicaments;

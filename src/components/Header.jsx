@@ -6,12 +6,12 @@ function Header() {
     return (
         <header className="site-header">
             <Link className="site-header__home" to="/">
-                Library
+                Pharmacie
             </Link>
 
             <nav className="site-header__nav">
-                <Link className="site-header__link" to="/Livres">
-                    Livres
+                <Link className="site-header__link" to="/medicaments">
+                    Médicaments
                 </Link>
 
             </nav>

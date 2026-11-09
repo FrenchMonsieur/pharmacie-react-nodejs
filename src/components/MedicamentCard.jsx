@@ -1,17 +1,17 @@
 
 import { Link } from 'react-router';
 
-function LivreCard({ titre, annee, nb_pages, prix, stock, auteur_nom, auteur_prenom, categorie_nom, id }) {
+function MedicamentCard({ id_med, nom, dosage, forme, prix_ht, categorie_nom }) {
     return (
-        <article className="livre-card">
-            <h2 className="livre-card__title">titre :{titre} parution :{annee}</h2>
-            <p className="livre-card_price">{prix} $</p>
-            <p className="livre-card_auteur_id">auteur :{auteur_prenom} {auteur_nom}</p>
-            <p className="livre-card_categorie_id">genre :{categorie_nom}</p>
-            <Link className="detail_link" to={`/livres/${id}`}>
+        <article className="medicament-card">
+            <h2 className="medicament-card__title">{nom} {dosage}</h2>
+            <p className="medicament-card_forme">forme :{forme}</p>
+            <p className="medicament-card_price">{prix_ht} € HT</p>
+            <p className="medicament-card_categorie">catégorie :{categorie_nom}</p>
+            <Link className="detail_link" to={`/medicaments/${id_med}`}>
                 Detail
             </Link>
         </article>
     );
 }
-export default LivreCard;
+export default MedicamentCard;

@@ -8,15 +8,15 @@ import './Detail.css';
 import DetailCard from '../components/DetailCard.jsx';
 
 function Detail() {
-    const [livre, setLivre] = useState(null);
+    const [medicament, setMedicament] = useState(null);
     const [chargement, setChargement] = useState(true);
     const [erreur, setErreur] = useState('');
     const { id } = useParams();
 
     useEffect(() => {
-        async function chargerLivre() {
+        async function chargerMedicament() {
             try {
-                const reponse = await fetch(`http://localhost:3000/api/livre/${id}`);
+                const reponse = await fetch(`http://localhost:3000/api/medicament/${id}`);
 
                 if (!reponse.ok) {
                     throw new Error(`Erreur HTTP ${reponse.status}`);
@@ -24,24 +24,24 @@ function Detail() {
 
                 const donnees = await reponse.json();
 
-                setLivre(donnees);
+                setMedicament(donnees);
             } catch (err) {
                 console.error(err);
 
-                setErreur('Impossible de charger le livre.');
+                setErreur('Impossible de charger le médicament.');
             } finally {
                 setChargement(false);
             }
         }
 
-        chargerLivre();
+        chargerMedicament();
     }, [id]);
 
     if (chargement) {
         return (
             <section className="library-page">
                 <h1 className="library-page__title">Detail</h1>
-                <p>Chargement du livre...</p>
+                <p>Chargement du médicament...</p>
             </section>
         );
     }
@@ -59,17 +59,18 @@ function Detail() {
         <section className="library-page">
             <h1 className="library-page__title">Detail</h1>
 
-            <div className="Detail-livre">
+            <div className="Detail-medicament">
                 <DetailCard
-                    titre={livre.titre}
-                    description={livre.description}
-                    annee={livre.annee}
-                    nb_pages={livre.nb_pages}
-                    prix={livre.prix}
-                    stock={livre.stock}
-                    auteur_nom={livre.auteur_nom}
-                    auteur_prenom={livre.auteur_prenom}
-                    categorie_nom={livre.categorie_nom}
+                    reference={medicament.reference}
+                    nom={medicament.nom}
+                    description={medicament.description}
+                    principe_actif={medicament.principe_actif}
+                    dosage={medicament.dosage}
+                    forme={medicament.forme}
+                    prix_ht={medicament.prix_ht}
+                    taux_tva={medicament.taux_tva}
+                    stock={medicament.stock}
+                    categorie_nom={medicament.categorie_nom}
                 />
             </div>
         </section>

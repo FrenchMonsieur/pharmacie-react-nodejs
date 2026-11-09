@@ -1,13 +1,14 @@
-function DetailCard({ titre, description, annee, nb_pages, prix, stock, auteur_nom, auteur_prenom, categorie_nom }) {
+function DetailCard({ reference, nom, description, principe_actif, dosage, forme, prix_ht, taux_tva, stock, categorie_nom }) {
     return (
-        <article className="livre-card">
-            <h2 className="livre-card__title">titre :{titre} parution :{annee}</h2>
-            <p className="livre-card_description">{description}</p>
-            <p className="livre-card_pages">{nb_pages} pages</p>
-            <p className="livre-card_price">{prix} $</p>
-            <p className="livre-card_stock">{stock} exemplaires</p>
-            <p className="livre-card_auteur_id">auteur :{auteur_prenom} {auteur_nom}</p>
-            <p className="livre-card_categorie_id">genre :{categorie_nom}</p>
+        <article className="medicament-card">
+            <h2 className="medicament-card__title">{nom} {dosage}</h2>
+            <p className="medicament-card_reference">référence :{reference}</p>
+            <p className="medicament-card_description">{description}</p>
+            <p className="medicament-card_principe">principe actif :{principe_actif}</p>
+            <p className="medicament-card_forme">forme :{forme}</p>
+            <p className="medicament-card_price">{prix_ht} € HT (TVA {taux_tva} %)</p>
+            <p className="medicament-card_stock">{stock} en stock</p>
+            <p className="medicament-card_categorie">catégorie :{categorie_nom}</p>
         </article>
     );
 }

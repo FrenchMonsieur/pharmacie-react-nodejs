@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
@@ -7,7 +6,7 @@ import pool from './db.js';
 
 const app = express();
 const port = Number(process.env.API_PORT) || 3000;
-const LIVRES_PAR_PAGE = 6;
+const MEDICAMENTS_PAR_PAGE = 6;
 
 // on limite les requêtes a 100 par minute pour éviter les abus et protéger le serveur
 const limiteur = rateLimit({
@@ -36,7 +35,7 @@ app.use(express.json());
 app.get('/api/categories', async (req, res) => {
     try {
         const [categories] = await pool.execute(
-            'SELECT id, nom FROM categorie ORDER BY id'
+            'SELECT id_cat, nom FROM categorie ORDER BY id_cat'
         );
 
         return res.json(categories);
@@ -48,33 +47,13 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
-// recupère le nom de chaque auteur pour le menu déroulant React
-app.get('/api/auteurs', async (req, res) => {
-    try {
-        const [auteurs] = await pool.execute(
-            'SELECT id, nom, prenom, nationalite FROM auteur ORDER BY id'
-        );
-
-        return res.json(auteurs);
-    } catch (err) {
-        console.error('Erreur lors de la récupération des auteurs :', err);
-        return res.status(500).json({
-            erreur: 'Une erreur interne est survenue.'
-        });
-    }
-});
-
-// GET /api/livre récupère les livres
-app.get('/api/livre', async (req, res) => {
+// GET /api/medicament récupère les médicaments
+app.get('/api/medicament', async (req, res) => {
 
     // Vérifie que les paramètres sont des chaînes avant d'appeler .trim().
     // Un paramètre absent (undefined) reste autorisé.
     if (req.query.categorie !== undefined && typeof req.query.categorie !== 'string') {
         return res.status(400).json({ erreur: 'Catégorie invalide.' });
-    }
-
-    if (req.query.auteur !== undefined && typeof req.query.auteur !== 'string') {
-        return res.status(400).json({ erreur: 'Auteur invalide.' });
     }
 
     if (req.query.prix !== undefined && typeof req.query.prix !== 'string') {
@@ -95,24 +74,22 @@ app.get('/api/livre', async (req, res) => {
 
     // trim() supprime les espaces au début et à la fin des valeurs.
     const categorie = req.query.categorie?.trim();
-    const auteur = req.query.auteur?.trim();
     const prix = req.query.prix?.trim();
     const nom = req.query.nom?.trim();
     const triDemande = req.query.tri?.trim() ?? '';
 
-    // la whitelist limite le tri aux colonnes de la table livre pour éviter les injections SQL
+    // la whitelist limite le tri aux colonnes de la table medicament pour éviter les injections SQL
     const whitelist = {
-        titre: 'livre.titre',
-        annee: 'livre.annee',
-        prix: 'livre.prix'
+        nom: 'medicament.nom',
+        prix: 'medicament.prix_ht'
     };
 
     // si le tri demandé n'est pas dans la whitelist, on utilise le tri par défaut
     const trie_resultat = Object.hasOwn(whitelist, triDemande)
         ? whitelist[triDemande]
-        : 'livre.id';
+        : 'medicament.id_med';
 
-    // on commencence la pagination à la page 1 
+    // on commencence la pagination à la page 1
     const page = Number(req.query.page ?? 1);
 
     // vérifie que la page demander est un nombre entier positif
@@ -123,7 +100,7 @@ app.get('/api/livre', async (req, res) => {
     }
 
     // calcul de l'offset pour la pagination
-    const pagination = (page - 1) * LIVRES_PAR_PAGE;
+    const pagination = (page - 1) * MEDICAMENTS_PAR_PAGE;
 
     // vérifie que l'offset est un nombre entier sûr
     if (!Number.isSafeInteger(pagination)) {
@@ -144,16 +121,6 @@ app.get('/api/livre', async (req, res) => {
     }
 
     if (
-        auteur !== undefined &&
-        auteur !== '' &&
-        (!Number.isInteger(Number(auteur)) || Number(auteur) <= 0)
-    ) {
-        return res.status(400).json({
-            erreur: 'Auteur invalide.'
-        });
-    }
-
-    if (
         prix !== undefined &&
         prix !== '' &&
         (!Number.isFinite(Number(prix)) || Number(prix) < 0)
@@ -169,128 +136,118 @@ app.get('/api/livre', async (req, res) => {
         });
     }
 
-    // requête SQL pour récupérer les livres avec ou sans filtre
-    let sql = 'SELECT livre.id, livre.titre, livre.annee, livre.nb_pages, livre.prix, livre.stock, auteur.nom AS auteur_nom, auteur.prenom AS auteur_prenom, categorie.nom AS categorie_nom FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
+    // seuls les médicaments validés par l'admin et actifs apparaissent dans le catalogue
+    const conditionCatalogue = "WHERE medicament.statut_validation = 'validé' AND medicament.actif = 1";
 
-    // requête SQL pour compter le nombre total de livres avec ou sans filtre
-    let sql_2 = 'SELECT COUNT(*) AS total FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
+    // requête SQL pour récupérer les médicaments avec ou sans filtre
+    let sql = `SELECT medicament.id_med, medicament.nom, medicament.image, medicament.dosage, medicament.forme, medicament.prix_ht, medicament.taux_tva, medicament.stock, categorie.nom AS categorie_nom FROM medicament INNER JOIN categorie ON medicament.id_cat = categorie.id_cat ${conditionCatalogue}`;
 
-    // requête SQL pour calculer le nombre de livres et le prix moyen
-    let sql_3 = 'SELECT COUNT(*) AS nombre_livres, COALESCE(ROUND(AVG(livre.prix), 2), 0) AS prix_moyen FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE 1=1';
+    // requête SQL pour compter le nombre total de médicaments avec ou sans filtre
+    let sql_2 = `SELECT COUNT(*) AS total FROM medicament INNER JOIN categorie ON medicament.id_cat = categorie.id_cat ${conditionCatalogue}`;
+
+    // requête SQL pour calculer le nombre de médicaments et le prix HT moyen
+    let sql_3 = `SELECT COUNT(*) AS nombre_medicaments, COALESCE(ROUND(AVG(medicament.prix_ht), 2), 0) AS prix_moyen FROM medicament INNER JOIN categorie ON medicament.id_cat = categorie.id_cat ${conditionCatalogue}`;
 
     // les paramètres sont stockés dans un tableau vide qui sera rempli en fonction des filtres appliqués
     const parametres = [];
 
     if (categorie !== undefined && categorie !== '') {
-        sql += ' AND livre.categorie_id = ?';
-        sql_2 += ' AND livre.categorie_id = ?';
-        sql_3 += ' AND livre.categorie_id = ?';
+        sql += ' AND medicament.id_cat = ?';
+        sql_2 += ' AND medicament.id_cat = ?';
+        sql_3 += ' AND medicament.id_cat = ?';
 
         parametres.push(categorie);
     }
 
-    if (auteur !== undefined && auteur !== '') {
-        sql += ' AND livre.auteur_id = ?';
-        sql_2 += ' AND livre.auteur_id = ?';
-        sql_3 += ' AND livre.auteur_id = ?';
-
-        parametres.push(auteur);
-    }
-
     if (prix !== undefined && prix !== '') {
-        sql += ' AND livre.prix <= ?';
-        sql_2 += ' AND livre.prix <= ?';
-        sql_3 += ' AND livre.prix <= ?';
+        sql += ' AND medicament.prix_ht <= ?';
+        sql_2 += ' AND medicament.prix_ht <= ?';
+        sql_3 += ' AND medicament.prix_ht <= ?';
 
         parametres.push(prix);
     }
 
     // on ajoute le tri demandé par l'utilisateur ou le tri par défaut a la requête SQL peut importe si il y a un filtre ou pas
-    sql += ` ORDER BY ${trie_resultat}, livre.titre`;
+    sql += ` ORDER BY ${trie_resultat}, medicament.nom`;
 
     if (!nom) {
-        sql += ` LIMIT ${LIVRES_PAR_PAGE} OFFSET ${pagination}`;
+        sql += ` LIMIT ${MEDICAMENTS_PAR_PAGE} OFFSET ${pagination}`;
     }
 
     try {
         const [resultat] = await pool.execute(sql, parametres);
 
-        let livrespage;
+        let medicamentspage;
         let page_number;
 
         let moyenne = null;
 
         if (nom) {
             const miniSearch = new MiniSearch({
-                fields: ['titre'],
+                idField: 'id_med',
+                fields: ['nom'],
                 storeFields: [
-                    'titre',
-                    'annee',
-                    'nb_pages',
-                    'prix',
+                    'id_med',
+                    'nom',
+                    'image',
+                    'dosage',
+                    'forme',
+                    'prix_ht',
+                    'taux_tva',
                     'stock',
-                    'auteur_nom',
-                    'auteur_prenom',
                     'categorie_nom'
                 ]
             });
 
             miniSearch.addAll(resultat);
 
-            const livresTrouves = miniSearch.search(nom, {
+            const medicamentsTrouves = miniSearch.search(nom, {
                 prefix: true,
                 fuzzy: 0.2
             });
 
             if (triDemande === 'prix') {
-                livresTrouves.sort((a, b) => {
-                    if (a.prix - b.prix === 0) {
-                        return a.titre.localeCompare(b.titre, 'fr');
+                medicamentsTrouves.sort((a, b) => {
+                    if (a.prix_ht - b.prix_ht === 0) {
+                        return a.nom.localeCompare(b.nom, 'fr');
                     }
-                    return a.prix - b.prix;
+                    return a.prix_ht - b.prix_ht;
                 });
-            } else if (triDemande === 'annee') {
-                livresTrouves.sort((a, b) => {
-                    if (a.annee - b.annee === 0) {
-                        return a.titre.localeCompare(b.titre, 'fr');
-                    }
-                    return a.annee - b.annee;
-                });
-            } else if (triDemande === 'titre') {
-                livresTrouves.sort((a, b) =>
-                    a.titre.localeCompare(b.titre, 'fr')
+            } else if (triDemande === 'nom') {
+                medicamentsTrouves.sort((a, b) =>
+                    a.nom.localeCompare(b.nom, 'fr')
                 );
             }
 
             page_number = Math.ceil(
-                livresTrouves.length / LIVRES_PAR_PAGE
+                medicamentsTrouves.length / MEDICAMENTS_PAR_PAGE
             );
 
-            livrespage = livresTrouves.slice(
+            medicamentspage = medicamentsTrouves.slice(
                 pagination,
-                pagination + LIVRES_PAR_PAGE
+                pagination + MEDICAMENTS_PAR_PAGE
             );
 
             if (categorie) {
 
-                const nombre_livres = livresTrouves.length;
+                const nombre_medicaments = medicamentsTrouves.length;
 
-                const totalPrix = livresTrouves.reduce((somme, livre) => {
-                    return somme + Number(livre.prix);
+                const totalPrix = medicamentsTrouves.reduce((somme, medicament) => {
+                    return somme + Number(medicament.prix_ht);
                 }, 0);
 
                 let prix_moyen;
 
-                if (nombre_livres > 0) {
+                if (nombre_medicaments > 0) {
                     prix_moyen = Number(
-                        (totalPrix / nombre_livres).toFixed(2)
+                        (totalPrix / nombre_medicaments).toFixed(2)
                     );
                 } else {
                     prix_moyen = 0;
                 }
 
                 moyenne = {
-                    nombre_livres,
+                    nombre_medicaments,
                     prix_moyen
                 };
             }
@@ -302,10 +259,10 @@ app.get('/api/livre', async (req, res) => {
             );
 
             page_number = Math.ceil(
-                resultat_total[0].total / LIVRES_PAR_PAGE
+                resultat_total[0].total / MEDICAMENTS_PAR_PAGE
             );
 
-            livrespage = resultat;
+            medicamentspage = resultat;
 
             if (categorie) {
                 const [statistiques] = await pool.execute(
@@ -318,13 +275,13 @@ app.get('/api/livre', async (req, res) => {
         }
 
         return res.json({
-            livrespage,
+            medicamentspage,
             page_number,
             moyenne
         });
 
     } catch (err) {
-        console.error('Erreur lors de la récupération des livres :', err);
+        console.error('Erreur lors de la récupération des médicaments :', err);
 
         return res.status(500).json({
             erreur: 'Une erreur interne est survenue.'
@@ -332,8 +289,8 @@ app.get('/api/livre', async (req, res) => {
     }
 });
 
-// GET /api/livre/:id récupère un livre par son id pour la page détaillée
-app.get('/api/livre/:id', async (req, res) => {
+// GET /api/medicament/:id récupère un médicament par son id pour la fiche produit
+app.get('/api/medicament/:id', async (req, res) => {
     const id = req.params.id;
 
     if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
@@ -343,21 +300,22 @@ app.get('/api/livre/:id', async (req, res) => {
     }
 
     try {
+        // même règle que le catalogue : un médicament non validé ou inactif est introuvable
         const [resultat] = await pool.execute(
-            'SELECT livre.id, livre.titre, livre.description, livre.annee, livre.nb_pages, livre.prix, livre.stock, auteur.nom AS auteur_nom, auteur.prenom AS auteur_prenom, categorie.nom AS categorie_nom FROM livre INNER JOIN auteur ON livre.auteur_id = auteur.id INNER JOIN categorie ON livre.categorie_id = categorie.id WHERE livre.id = ?',
+            "SELECT medicament.id_med, medicament.reference, medicament.nom, medicament.description, medicament.image, medicament.principe_actif, medicament.dosage, medicament.forme, medicament.prix_ht, medicament.taux_tva, medicament.stock, categorie.nom AS categorie_nom FROM medicament INNER JOIN categorie ON medicament.id_cat = categorie.id_cat WHERE medicament.id_med = ? AND medicament.statut_validation = 'validé' AND medicament.actif = 1",
             [id]
         );
 
         if (resultat.length === 0) {
             return res.status(404).json({
-                erreur: 'Livre introuvable.'
+                erreur: 'Médicament introuvable.'
             });
         }
 
         return res.json(resultat[0]);
 
     } catch (err) {
-        console.error('Erreur lors de la récupération du livre :', err);
+        console.error('Erreur lors de la récupération du médicament :', err);
 
         return res.status(500).json({
             erreur: 'Une erreur interne est survenue.'
