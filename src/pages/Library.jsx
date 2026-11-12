@@ -13,7 +13,9 @@ function Library() {
     useEffect(() => {
         async function chargerCategories() {
             try {
-                const reponse = await fetch('http://localhost:3000/api/categories');
+                const reponse = await fetch('http://localhost:3000/api/categories', {
+                    credentials: 'include'
+                });
 
                 if (!reponse.ok) {
                     throw new Error(`Erreur HTTP ${reponse.status}`);

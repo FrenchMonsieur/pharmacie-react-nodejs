@@ -16,7 +16,9 @@ function Detail() {
     useEffect(() => {
         async function chargerMedicament() {
             try {
-                const reponse = await fetch(`http://localhost:3000/api/medicament/${id}`);
+                const reponse = await fetch(`http://localhost:3000/api/medicament/${id}`, {
+                    credentials: 'include'
+                });
 
                 if (!reponse.ok) {
                     throw new Error(`Erreur HTTP ${reponse.status}`);

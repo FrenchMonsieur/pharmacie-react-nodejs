@@ -21,6 +21,7 @@ function Medicaments() {
 
     useEffect(() => {
 
+        // controller est la pour annuler la requete si l'utilisateur change de filtre avant que la requete ne soit finie
         const controller = new AbortController();
         const timer = setTimeout(() => {
             async function chargerMedicaments() {
@@ -28,7 +29,8 @@ function Medicaments() {
                     setChargementMedicament(true);
                     setErreur('');
                     const reponse = await fetch(`http://localhost:3000/api/medicament?categorie=${categorie}&prix=${prix}&nom=${nom}&tri=${tri}&page=${page}`, {
-                        signal: controller.signal
+                        signal: controller.signal,
+                        credentials: 'include'
                     });
 
                     if (!reponse.ok) {
@@ -69,7 +71,9 @@ function Medicaments() {
     useEffect(() => {
         async function chargerCategorie() {
             try {
-                const reponse = await fetch('http://localhost:3000/api/categories');
+                const reponse = await fetch('http://localhost:3000/api/categories', {
+                    credentials: 'include'
+                });
                 if (!reponse.ok) {
                     throw new Error(`Erreur HTTP ${reponse.status}`);
                 }

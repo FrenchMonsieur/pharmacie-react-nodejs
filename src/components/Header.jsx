@@ -14,6 +14,32 @@ function Header() {
                     Médicaments
                 </Link>
 
+                <Link className="site-header__link" to="/connexion">
+                    Connexion
+                </Link>
+
+                <Link className="site-header__link" to="/profil">
+                    Profil
+                </Link>
+
+                <button className="site-header__link" onClick={() => {
+                    fetch("http://localhost:3000/api/deconnexion", {
+                        method: "POST",
+                        credentials: "include",
+                    })
+                        .then((reponse) => {
+                            if (reponse.ok) {
+                                window.location.href = "/connexion";
+                            } else {
+                                console.error("Échec de la déconnexion");
+                            }
+                        })
+                        .catch((erreur) => {
+                            console.error("Erreur pendant la déconnexion :", erreur);
+                        });
+                }}>
+                    Déconnexion
+                </button>
             </nav>
         </header>
     );
