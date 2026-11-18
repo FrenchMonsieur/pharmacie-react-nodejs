@@ -135,8 +135,8 @@ function Medicaments() {
 
             {categorie !== "" && moyenne && (
                 <div className="stat">
-                    <p>{moyenne.nombre_medicaments}</p>
-                    <p>{moyenne.prix_moyen} € HT</p>
+                    <p>{moyenne.nombre_medicaments} : nombre de médicaments disponibles</p>
+                    <p>{moyenne.prix_moyen} € : prix moyen HT</p>
                 </div>
             )}
 
