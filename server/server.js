@@ -5,6 +5,7 @@ import MiniSearch from 'minisearch';
 import pool from './db.js';
 import session from 'express-session';
 import bcrypt from "bcrypt";
+import { guard_login, guard_admin, guard_fournisseur, guard_professionnel } from '../middleware/auth.js';
 
 const app = express();
 const port = Number(process.env.API_PORT) || 3000;
@@ -34,7 +35,7 @@ app.use(express.json());
 
 // le navigateur refuse les requêtes de plusieurs port donc on utilise cors pour autoriser les requêtes de notre front react et de notre site netlify 
 app.use(cors({
-    credentials: true,
+    credentials: true, // pour que le navigateur envoie les cookies de session
     origin: [
         'http://localhost:5173',
         'https://monsite.netlify.app' // À remplacer par la vraie adresse du site.
@@ -51,7 +52,7 @@ app.use(session({
         httpOnly: true,       // le JavaScript de la page ne peut pas lire le cookie
         sameSite: 'lax',      // limite l'envoi du cookie depuis un autre site
         secure: false,        // false en local (HTTP) ; true en production (HTTPS)
-        maxAge: 30 * 60 * 1000 // durée de vie : 30 minutes
+        maxAge: 30 * 24 * 60 * 60 * 1000 // durée de vie : 1 mois (30 jours)
     }
 }));
 
@@ -112,10 +113,7 @@ async function trouverUtilisateurParId(id_uti) {
 
 // pour ce souvenir de l"utilisateur si il refresh ou autre
 app.get('/api/remember-me', async (req, res) => {
-    if (!req.session.utilisateur) {
-        return res.status(401).json({ erreur: 'Utilisateur non connecté.' });
-    }
-
+    guard_login();
 
     try {
         const utilisateur = await trouverUtilisateurParId(req.session.utilisateur.id_uti);
@@ -135,9 +133,7 @@ app.get('/api/remember-me', async (req, res) => {
 app.get('/api/utilisateur/:id_uti', async (req, res) => {
     const id = req.params.id_uti;
 
-    if (!req.session.utilisateur) {
-        return res.status(401).json({ erreur: 'Utilisateur non connecté.' });
-    }
+    guard_login();
 
     if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
         return res.status(400).json({ erreur: 'Identifiant invalide.' });
